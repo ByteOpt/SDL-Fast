@@ -37,6 +37,13 @@ extension/        Chrome / Edge 嗅探插件
 scripts/          图标等辅助脚本
 ```
 
+## 下载
+
+安装包与浏览器插件见 [Releases](https://github.com/ByteOpt/SDL-Fast/releases/tag/v1.0.0)。
+
+- `SDL Fast-setup.exe`：Windows 安装包
+- `SDL-Fast-extension.zip`：解压后加载其中的 `extension` 目录
+
 ## 运行客户端
 
 需要 [Node.js](https://nodejs.org/) 18 或更高版本。
