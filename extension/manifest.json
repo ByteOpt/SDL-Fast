@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "SDL Fast 资源嗅探",
+  "version": "1.0.0",
+  "description": "把网页里的视频、音频和文件发送到 SDL Fast 下载器。",
+  "permissions": [
+    "webRequest",
+    "downloads",
+    "contextMenus",
+    "storage",
+    "notifications",
+    "tabs",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://127.0.0.1:18761/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SDL Fast 嗅探",
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "name": "sdl-fast",
+  "productName": "SDL Fast",
+  "version": "1.0.0",
+  "description": "Windows 高速多线程下载器",
+  "main": "src/main/index.js",
+  "author": "ByteOpt",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --win portable --x64"
+  },
+  "build": {
+    "appId": "com.sdlfast.desktop",
+    "productName": "SDL Fast",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^37.4.0",
+    "electron-builder": "^26.0.12"
+  }
+}

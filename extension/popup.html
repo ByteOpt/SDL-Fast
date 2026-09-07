@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { width: 360px; margin: 0; font-family: "Segoe UI","Microsoft YaHei",sans-serif; font-size: 12px; background: #f4f5f6; }
+  .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: linear-gradient(#4aa3f0,#2f7be0); color: #fff; }
+  .head h1 { font-size: 13px; margin: 0; flex: 1; }
+  .head button, .foot button { border: none; cursor: pointer; }
+  .head button { background: rgba(255,255,255,.2); color: #fff; padding: 4px 8px; border-radius: 3px; }
+  .list { max-height: 340px; overflow-y: auto; }
+  .item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid #e6e8ea; background: #fff; }
+  .item:hover { background: #f2f8ff; }
+  .meta { flex: 1; min-width: 0; }
+  .fn { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub { color: #888; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty { padding: 24px 12px; text-align: center; color: #999; }
+  .foot { display: flex; gap: 8px; padding: 10px 12px; }
+  .foot button { flex: 1; padding: 7px; border: 1px solid #b0b4b8; border-radius: 3px; background: #fff; }
+  .foot button.primary { background: linear-gradient(#4aa3f0,#2f7be0); color: #fff; border-color: #2f7be0; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #e3eefb; color: #2f7be0; }
+  .hint { font-size: 10px; color: #d32f2f; margin-top: 2px; }
+  .takeover { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid #eef1f6; }
+  .gear { margin-left: auto; border: none; background: none; cursor: pointer; }
+  .settings { display: none; padding: 10px 12px; background: #fbfcfe; border-bottom: 1px solid #eef1f6; }
+  .settings.open { display: block; }
+  .cats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 8px; }
+  .cats label { display: flex; align-items: center; gap: 6px; }
+  input[type=text], input[type=number] { border: 1px solid #d5dbe6; border-radius: 4px; padding: 5px 7px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>SDL Fast 嗅探到的资源</h1>
+    <button id="clear">清空</button>
+  </div>
+  <div class="takeover">
+    <input type="checkbox" id="takeover" checked>
+    <label for="takeover">接管浏览器下载</label>
+    <button class="gear" id="gear" title="设置">设置</button>
+  </div>
+  <div class="settings" id="settings">
+    <div class="cats" id="cats"></div>
+    <label>自定义扩展名</label>
+    <input type="text" id="customExt" placeholder="psd, sketch" style="width:100%;box-sizing:border-box;margin:4px 0 8px">
+    <label>仅接管大于 <input type="number" id="minSize" min="0" value="0" style="width:56px"> MB</label>
+    <div id="saved" style="color:#0f9d6b;height:14px;margin-top:6px"></div>
+  </div>
+  <div id="list" class="list"></div>
+  <div class="foot">
+    <button id="selAll">全选</button>
+    <button id="send" class="primary">下载所选</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

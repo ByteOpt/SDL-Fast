@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>SDL Fast</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="toolbar">
+    <button class="tb" id="btnAdd" title="添加 URL">
+      <span class="ico add"></span>
+      <span>添加URL</span>
+    </button>
+    <button class="tb" id="btnResume" disabled>
+      <span class="ico resume"></span>
+      <span>恢复</span>
+    </button>
+    <button class="tb" id="btnPause" disabled>
+      <span class="ico pause"></span>
+      <span>暂停</span>
+    </button>
+    <button class="tb" id="btnPauseAll">
+      <span class="ico stop"></span>
+      <span>全部暂停</span>
+    </button>
+    <button class="tb" id="btnDelete" disabled>
+      <span class="ico del"></span>
+      <span>删除</span>
+    </button>
+    <button class="tb" id="btnOpen" disabled>
+      <span class="ico open"></span>
+      <span>打开</span>
+    </button>
+    <button class="tb" id="btnFolder" disabled>
+      <span class="ico folder"></span>
+      <span>打开文件夹</span>
+    </button>
+    <button class="tb" id="btnSniff">
+      <span class="ico sniff"></span>
+      <span>嗅探</span>
+    </button>
+  </header>
+
+  <div class="main">
+    <aside class="side">
+      <div class="side-title">类别</div>
+      <button class="nav active" data-filter="all">全部下载</button>
+      <button class="nav" data-filter="downloading">正在下载</button>
+      <button class="nav" data-filter="completed">已完成</button>
+      <div class="side-title">分类</div>
+      <button class="nav" data-cat="video">视频</button>
+      <button class="nav" data-cat="music">音乐</button>
+      <button class="nav" data-cat="program">程序</button>
+      <button class="nav" data-cat="archive">压缩文件</button>
+      <button class="nav" data-cat="document">文档</button>
+      <button class="nav" data-cat="model">大模型</button>
+    </aside>
+
+    <section class="list-wrap">
+      <div class="cols">
+        <span class="c-name">名称</span>
+        <span class="c-size">大小</span>
+        <span class="c-status">状态</span>
+        <span class="c-prog">进度</span>
+        <span class="c-speed">速度</span>
+        <span class="c-eta">剩余时间</span>
+      </div>
+      <div id="rows" class="rows"></div>
+      <div id="empty" class="empty">还没有下载任务。点击“添加URL”或使用浏览器嗅探。</div>
+    </section>
+  </div>
+
+  <footer class="status">
+    <span id="statCount">0 个任务</span>
+    <span id="statSpeed">总速度: 0 B/s</span>
+  </footer>
+
+  <div id="modal" class="modal hidden">
+    <div class="dialog" id="dialogBox"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
