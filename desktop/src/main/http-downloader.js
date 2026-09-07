@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { request } = require('./net');
+const { request, header } = require('./net');
 const { isHuggingFace, isSignedCdn } = require('./classify');
 
 function planConnections(size, requested, url) {
@@ -68,6 +68,8 @@ class HttpDownloader {
     if (!reuse) task.ranges = splitRanges(size, n);
     task.size = size;
     task.connections = n;
+    this.recount();
+    this.hooks.onProgress();
 
     const exists = fs.existsSync(dest);
     this.fd = await fs.promises.open(dest, exists && reuse ? 'r+' : 'w+');
@@ -113,8 +115,18 @@ class HttpDownloader {
       throw new Error(`HTTP ${res.statusCode}`);
     }
     const flags = res.statusCode === 206 ? 'a' : 'w';
+    const cl = parseInt(header(res, 'content-length'), 10);
+    if (res.statusCode === 206) {
+      const cr = header(res, 'content-range');
+      const total = /\/(\d+)\s*$/.exec(cr);
+      if (total) this.task.size = parseInt(total[1], 10);
+    } else if (Number.isFinite(cl) && cl > 0) {
+      this.task.size = flags === 'a' ? existing + cl : cl;
+    }
     const stream = fs.createWriteStream(tmp, { flags });
     let got = flags === 'a' ? existing : 0;
+    this.task.downloaded = got;
+    this.hooks.onProgress();
     this.activeThreads = 1;
     this.peakThreads = 1;
     await new Promise((resolve, reject) => {
@@ -158,11 +170,11 @@ class HttpDownloader {
     const headers = Object.assign({}, this.task.headers, { Range: `bytes=${from}-${to}` });
     const { res } = await request(url, { headers, signal: this.abort.signal, timeout: 60000 });
     if (res.statusCode === 200) {
-      res.resume();
+      try { res.destroy(); } catch { /* ignore */ }
       throw new Error('no-range');
     }
     if (res.statusCode !== 206) {
-      res.resume();
+      try { res.destroy(); } catch { /* ignore */ }
       throw new Error(`HTTP ${res.statusCode}`);
     }
     this.activeThreads += 1;

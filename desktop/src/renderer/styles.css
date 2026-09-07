@@ -171,17 +171,29 @@ body {
 .row.selected { background: var(--sel); }
 .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.prog .bar { flex: 1; min-width: 48px; }
+.pct { width: 36px; flex: none; color: #666; font-size: 11px; text-align: right; }
 .bar {
   height: 8px;
   background: #e6e6e6;
   border-radius: 4px;
   overflow: hidden;
 }
+.bar-fill,
 .bar > i {
   display: block;
   height: 100%;
   background: linear-gradient(#58d066, var(--bar));
   width: 0;
+}
+.bar.wait .bar-fill {
+  width: 28% !important;
+  animation: bar-wait 1s linear infinite;
+}
+@keyframes bar-wait {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(360%); }
 }
 .st-down { color: var(--blue-deep); }
 .st-done { color: var(--green); }

@@ -121,7 +121,7 @@ class HlsDownloader {
     const out = fs.createWriteStream(tsPath);
     const keyCache = new Map();
     const concurrency = Math.min(16, this.task.connections || 8);
-    this.task.size = segments.length;
+    this.task.progressHint = 0;
     this.task.downloaded = 0;
 
     const results = new Map();
@@ -134,10 +134,12 @@ class HlsDownloader {
         const buf = await this.fetchSegment(segments[i], headers, keyCache);
         results.set(i, buf);
         while (results.has(written)) {
-          out.write(results.get(written));
+          const chunk = results.get(written);
+          out.write(chunk);
           results.delete(written);
           written += 1;
-          this.task.downloaded = written;
+          this.task.downloaded += chunk.length;
+          this.task.progressHint = (written / segments.length) * 100;
           this.hooks.onProgress();
         }
       }
@@ -160,7 +162,8 @@ class HlsDownloader {
       this.task.savePath = dest.replace(/\.[^.]+$/, '.ts');
       this.task.filename = path.basename(this.task.savePath);
     }
-    this.task.downloaded = this.task.size;
+    if (this.task.downloaded) this.task.size = this.task.downloaded;
+    this.task.progressHint = 100;
   }
 
   async fetchSegment(segment, headers, keyCache) {

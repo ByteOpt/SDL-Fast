@@ -71,22 +71,25 @@ function header(res, name) {
   return key ? String(res.headers[key]) : '';
 }
 
+function dropBody(res) {
+  try { res.destroy(); } catch { /* ignore */ }
+}
+
 async function probe(url, headers) {
-  const common = { headers, timeout: 20000 };
+  const common = { timeout: 20000 };
   let result = await request(url, Object.assign({
     method: 'GET',
     headers: Object.assign({}, headers, { Range: 'bytes=0-0' }),
   }, common));
   if (result.res.statusCode >= 400) {
-    result.res.resume();
-    result = await request(url, Object.assign({ method: 'HEAD' }, common));
+    dropBody(result.res);
+    result = await request(url, Object.assign({ method: 'HEAD', headers }, common));
   }
   const res = result.res;
   const mime = header(res, 'content-type').split(';')[0].trim();
-  const hasRange = res.statusCode === 206 || /bytes/i.test(header(res, 'accept-ranges')) || Boolean(header(res, 'content-range'));
-  let size = 0;
   const cr = header(res, 'content-range');
   const m = /\/(\d+)\s*$/.exec(cr);
+  let size = 0;
   if (m) size = parseInt(m[1], 10);
   else {
     const cl = parseInt(header(res, 'content-length'), 10);
@@ -98,13 +101,13 @@ async function probe(url, headers) {
   if (fm) {
     try { filename = decodeURIComponent(fm[1]); } catch { filename = fm[1]; }
   }
-  res.resume();
+  dropBody(res);
   return {
     url: result.url,
     status: res.statusCode,
     mime,
     size,
-    acceptRanges: Boolean(hasRange && size > 1),
+    acceptRanges: res.statusCode === 206 && size > 1,
     filename,
   };
 }

@@ -31,6 +31,13 @@ function accrueActive(task) {
   task._runStart = 0;
 }
 
+function taskProgress(task) {
+  if (task.status === 'completed') return 100;
+  if (task.size > 0) return Math.min(100, ((task.downloaded || 0) / task.size) * 100);
+  if (task.progressHint > 0) return Math.min(100, Number(task.progressHint) || 0);
+  return 0;
+}
+
 function computeAvgSpeed(task) {
   const bytes = Number(task.size || task.downloaded || 0);
   if (bytes <= 0) return 0;
@@ -89,7 +96,7 @@ class Manager extends EventEmitter {
       speed: t.speed || 0,
       avgSpeed: computeAvgSpeed(t),
       eta: t.eta || '',
-      progress: t.size ? Math.min(100, (t.downloaded / t.size) * 100) : (t.status === 'completed' ? 100 : 0),
+      progress: taskProgress(t),
       createdAt: t.createdAt,
       startedAt: t.startedAt || null,
       finishedAt: t.finishedAt || null,
@@ -109,6 +116,14 @@ class Manager extends EventEmitter {
 
   emitChange() {
     this.emit('change', this.totals());
+  }
+
+  scheduleEmit() {
+    if (this._emitTimer) return;
+    this._emitTimer = setTimeout(() => {
+      this._emitTimer = null;
+      this.emitChange();
+    }, 200);
   }
 
   settings() {
@@ -257,6 +272,7 @@ class Manager extends EventEmitter {
         const rec = this.speeds.get(task.id) || { last: task.downloaded, speed: 0 };
         rec.seen = Date.now();
         this.speeds.set(task.id, rec);
+        this.scheduleEmit();
       },
     };
     const runner = { stop() {} };
@@ -279,6 +295,7 @@ class Manager extends EventEmitter {
         }
         if (info.size) task.size = info.size;
         if (isHuggingFace(task.url) && !task.category) task.category = 'model';
+        this.emitChange();
         const dl = new HttpDownloader(task, hooks);
         runner.stop = () => dl.stop();
         await dl.run(info);
@@ -395,4 +412,4 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, Number(n) || a));
 }
 
-module.exports = { Manager };
+module.exports = { Manager, taskProgress };

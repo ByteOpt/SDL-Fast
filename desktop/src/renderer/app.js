@@ -27,6 +27,17 @@ function speedText(t) {
   return '—';
 }
 
+function progressPct(t) {
+  return Math.max(0, Math.min(100, Number(t.progress) || 0));
+}
+
+function progressCell(t) {
+  const pct = progressPct(t);
+  const wait = (t.status === 'downloading' || t.status === 'merging') && pct <= 0;
+  const label = t.status === 'completed' ? '100%' : (pct > 0 || t.size ? `${Math.floor(pct)}%` : '—');
+  return `<div class="prog"><div class="bar${wait ? ' wait' : ''}"><span class="bar-fill" style="width:${pct}%"></span></div><span class="pct">${label}</span></div>`;
+}
+
 function statusText(t) {
   if (t.status === 'downloading') return '下载中';
   if (t.status === 'merging') return '合并中';
@@ -70,9 +81,7 @@ function render() {
       </div>
       <div>${t.size ? fmtSize(t.size) : (t.downloaded ? fmtSize(t.downloaded) : '—')}</div>
       <div class="${statusClass(t.status)}">${escapeHtml(statusText(t))}</div>
-      <div>
-        <div class="bar"><i style="width:${Math.max(0, Math.min(100, t.progress || 0))}%"></i></div>
-      </div>
+      <div>${progressCell(t)}</div>
       <div title="${t.status === 'completed' && t.avgSpeed ? '平均速率' : ''}">${speedText(t)}</div>`;
     el.addEventListener('mousedown', (e) => onRowClick(e, t.id, list));
     el.addEventListener('dblclick', () => {

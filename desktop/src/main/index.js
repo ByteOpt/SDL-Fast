@@ -33,11 +33,22 @@ function createWindow() {
     },
   });
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  mainWindow.webContents.once('did-finish-load', () => {
+    if (manager) send('tasks:updated', manager.totals());
+  });
   Menu.setApplicationMenu(null);
 }
 
 function send(channel, data) {
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, data);
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const wc = mainWindow.webContents;
+  if (wc.isLoadingMainFrame()) {
+    wc.once('did-finish-load', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, data);
+    });
+    return;
+  }
+  wc.send(channel, data);
 }
 
 function bindIpc() {

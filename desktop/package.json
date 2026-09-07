@@ -1,7 +1,7 @@
 {
   "name": "sdl-fast",
   "productName": "SDL Fast",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Windows 高速多线程下载器",
   "main": "src/main/index.js",
   "author": "ByteOpt",

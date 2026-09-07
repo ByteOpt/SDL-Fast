@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SDL Fast 资源嗅探",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "把网页里的视频、音频和文件发送到 SDL Fast 下载器。",
   "permissions": [
     "webRequest",
