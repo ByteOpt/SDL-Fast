@@ -25,6 +25,24 @@ function formatEta(downloaded, size, speed) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+function accrueActive(task) {
+  if (!task._runStart) return;
+  task.activeMs = (task.activeMs || 0) + Math.max(0, Date.now() - task._runStart);
+  task._runStart = 0;
+}
+
+function computeAvgSpeed(task) {
+  const bytes = Number(task.size || task.downloaded || 0);
+  if (bytes <= 0) return 0;
+  if (task.avgSpeed > 0) return Math.round(task.avgSpeed);
+  const ms = task.activeMs
+    || (task.finishedAt && (task.startedAt || task.createdAt)
+      ? task.finishedAt - (task.startedAt || task.createdAt)
+      : 0);
+  if (ms < 1) return 0;
+  return Math.max(1, Math.round(bytes / (ms / 1000)));
+}
+
 class Manager extends EventEmitter {
   constructor(store, userData) {
     super();
@@ -69,9 +87,12 @@ class Manager extends EventEmitter {
       error: t.error || '',
       connections: t.connections,
       speed: t.speed || 0,
+      avgSpeed: computeAvgSpeed(t),
       eta: t.eta || '',
       progress: t.size ? Math.min(100, (t.downloaded / t.size) * 100) : (t.status === 'completed' ? 100 : 0),
       createdAt: t.createdAt,
+      startedAt: t.startedAt || null,
+      finishedAt: t.finishedAt || null,
       ranges: (t.ranges || []).map((r) => ({ start: r.start, end: r.end, done: r.done || 0 })),
       peakThreads: t.peakThreads || t.connections || 0,
     }));
@@ -128,7 +149,10 @@ class Manager extends EventEmitter {
       connections: clamp(input.connections || s.connections, 1, 64),
       headers,
       createdAt: Date.now(),
+      startedAt: null,
       finishedAt: null,
+      activeMs: 0,
+      avgSpeed: 0,
       ranges: null,
       speed: 0,
       eta: '',
@@ -155,6 +179,7 @@ class Manager extends EventEmitter {
     const runner = this.runners.get(id);
     if (runner) runner.stop();
     if (task.status === 'downloading' || task.status === 'merging' || task.status === 'queued') {
+      accrueActive(task);
       task.status = 'paused';
     }
     this.persist();
@@ -224,6 +249,8 @@ class Manager extends EventEmitter {
     if (this.runners.has(task.id)) return;
     task.status = 'downloading';
     task.error = '';
+    if (!task.startedAt) task.startedAt = Date.now();
+    task._runStart = Date.now();
     this.emitChange();
     const hooks = {
       onProgress: () => {
@@ -256,13 +283,19 @@ class Manager extends EventEmitter {
         runner.stop = () => dl.stop();
         await dl.run(info);
       }
-      if (task.status === 'paused') return;
+      if (task.status === 'paused') {
+        accrueActive(task);
+        return;
+      }
+      accrueActive(task);
       task.status = 'completed';
       task.finishedAt = Date.now();
       task.speed = 0;
       task.eta = '';
       if (task.size) task.downloaded = task.size;
+      task.avgSpeed = computeAvgSpeed(task);
     } catch (err) {
+      accrueActive(task);
       if (/aborted/i.test(String(err.message))) {
         task.status = 'paused';
       } else {

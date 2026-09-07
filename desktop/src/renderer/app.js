@@ -21,6 +21,12 @@ function fmtSpeed(n) {
   return fmtSize(n) + '/s';
 }
 
+function speedText(t) {
+  if (t.status === 'downloading' || t.status === 'merging') return fmtSpeed(t.speed);
+  if (t.status === 'completed' && t.avgSpeed) return fmtSpeed(t.avgSpeed);
+  return '—';
+}
+
 function statusText(t) {
   if (t.status === 'downloading') return '下载中';
   if (t.status === 'merging') return '合并中';
@@ -67,7 +73,7 @@ function render() {
       <div>
         <div class="bar"><i style="width:${Math.max(0, Math.min(100, t.progress || 0))}%"></i></div>
       </div>
-      <div>${t.status === 'downloading' ? fmtSpeed(t.speed) : '—'}</div>`;
+      <div title="${t.status === 'completed' && t.avgSpeed ? '平均速率' : ''}">${speedText(t)}</div>`;
     el.addEventListener('mousedown', (e) => onRowClick(e, t.id, list));
     el.addEventListener('dblclick', () => {
       if (t.status === 'completed') window.sdl.openFile(t.id);
@@ -474,6 +480,10 @@ function bind() {
 
   window.sdl.onTasks(applyState);
   window.sdl.onCapture((items) => {
+    if (settings.autoStartCapture !== false) {
+      items.forEach((it) => window.sdl.add(it));
+      return;
+    }
     if (items.length === 1) dialogAdd(items[0]);
     else dialogCapture(items);
   });

@@ -39,7 +39,7 @@ scripts/          图标等辅助脚本
 
 ## 下载
 
-安装包与浏览器插件见 [Releases](https://github.com/ByteOpt/SDL-Fast/releases/tag/v1.0.0)。
+安装包与浏览器插件见 [Releases](https://github.com/ByteOpt/SDL-Fast/releases/latest)。
 
 - `SDL Fast-setup.exe`：Windows 安装包
 - `SDL-Fast-extension.zip`：解压后加载其中的 `extension` 目录

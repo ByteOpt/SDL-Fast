@@ -24,15 +24,21 @@ function readJson(req) {
   });
 }
 
-function send(res, code, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(code, {
+function cors(res, extra) {
+  const headers = Object.assign({
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Content-Length': Buffer.byteLength(body),
-  });
+    'Access-Control-Allow-Private-Network': 'true',
+    Connection: 'keep-alive',
+  }, extra || {});
+  return headers;
+}
+
+function send(res, code, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, cors(res, { 'Content-Length': Buffer.byteLength(body) }));
   res.end(body);
 }
 
@@ -52,7 +58,8 @@ function normalizeCapture(body) {
 function startServer(port, onCapture) {
   const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
-      send(res, 204, { ok: true });
+      res.writeHead(204, cors(res));
+      res.end();
       return;
     }
     const url = req.url.split('?')[0];
@@ -68,8 +75,8 @@ function startServer(port, onCapture) {
           send(res, 400, { ok: false, error: 'empty' });
           return;
         }
-        onCapture(items);
         send(res, 200, { ok: true, count: items.length });
+        setImmediate(() => onCapture(items));
       } catch (err) {
         send(res, 400, { ok: false, error: String(err.message || err) });
       }
@@ -77,6 +84,8 @@ function startServer(port, onCapture) {
     }
     send(res, 404, { ok: false });
   });
+  server.keepAliveTimeout = 60000;
+  server.headersTimeout = 65000;
   return new Promise((resolve, reject) => {
     server.on('error', reject);
     server.listen(port, '127.0.0.1', () => resolve(server));

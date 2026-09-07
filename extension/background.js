@@ -1,6 +1,6 @@
 'use strict';
 
-const ENDPOINT = 'http://127.0.0.1:18761/capture';
+const ENDPOINT = 'http://127.0.0.1:18761';
 const PLATFORM = /(youtube\.com|youtu\.be|tiktok\.com|bilibili\.com|x\.com|twitter\.com|vimeo\.com|twitch\.tv|facebook\.com|instagram\.com|reddit\.com|dailymotion\.com)$/i;
 const FILE_EXT = /\.(mp4|mkv|avi|mov|webm|flv|mp3|flac|wav|aac|m4a|ogg|zip|rar|7z|tar|gz|exe|msi|dmg|apk|pdf|docx?|xlsx?|pptx?|gguf|safetensors|iso)(\?|$)/i;
 const STREAM_RE = /(\.m3u8|\.mpd)(\?|$)/i;
@@ -249,7 +249,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     });
     return true;
   }
-  if (msg.type === 'send') { postCapture(msg.items); reply({ ok: true }); return true; }
+  if (msg.type === 'send') {
+    reply({ ok: true });
+    postCapture(msg.items);
+    return false;
+  }
   if (msg.type === 'clear') { byTab.delete(msg.tabId); badge(msg.tabId); reply({ ok: true }); return true; }
 });
 
@@ -345,6 +349,28 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+async function postJson(path, body, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 1200);
+  try {
+    const res = await fetch('http://127.0.0.1:18761' + path, {
+      method: body ? 'POST' : 'GET',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+      keepalive: true,
+      signal: ctrl.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function warmClient() {
+  postJson('/health', null, 600).catch(() => {});
+}
+
 async function postCapture(items) {
   const payload = items.map((it) => ({
     url: it.url,
@@ -354,19 +380,29 @@ async function postCapture(items) {
     size: it.size,
     headers: it.referer ? { Referer: it.referer } : it.headers,
   }));
-  try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload.length === 1 ? payload[0] : { items: payload }),
-    });
-    if (!res.ok) throw new Error('bad status');
-    notify('已发送到 SDL Fast', payload.length === 1 ? payload[0].filename : payload.length + ' 个资源');
-  } catch {
-    notify('发送失败', '请先启动 SDL Fast 客户端（端口 18761）。');
+  const body = payload.length === 1 ? payload[0] : { items: payload };
+  let lastErr = null;
+  for (let i = 0; i < 2; i++) {
+    try {
+      const res = await postJson('/capture', body, 1500);
+      if (!res || !res.ok) throw new Error('bad status');
+      notify('已发送到 SDL Fast', payload.length === 1 ? payload[0].filename : payload.length + ' 个资源');
+      return;
+    } catch (err) {
+      lastErr = err;
+    }
   }
+  notify('发送失败', '请先启动 SDL Fast 客户端（端口 18761）。');
+  return lastErr;
 }
 
 function notify(title, message) {
   chrome.notifications.create({ type: 'basic', iconUrl: 'icons/48.png', title, message });
 }
+
+warmClient();
+chrome.runtime.onStartup.addListener(warmClient);
+chrome.alarms.create('sdl-ping', { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === 'sdl-ping') warmClient();
+});

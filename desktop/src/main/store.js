@@ -62,7 +62,10 @@ class Store {
       connections: t.connections,
       headers: t.headers || {},
       createdAt: t.createdAt,
+      startedAt: t.startedAt || null,
       finishedAt: t.finishedAt || null,
+      activeMs: t.activeMs || 0,
+      avgSpeed: t.avgSpeed || 0,
       ranges: t.ranges || null,
     }));
     writeJson(this.tasksFile, slim);
