@@ -6,3 +6,7 @@ desktop/.cache/
 .DS_Store
 Thumbs.db
 *.tmp
+SDL Fast 安装版/*.exe
+scripts/_accel_tmp/
+scripts/_accel_result.txt
+scripts/_menus.txt

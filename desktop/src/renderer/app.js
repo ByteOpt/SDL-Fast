@@ -67,8 +67,7 @@ function render() {
       <div>
         <div class="bar"><i style="width:${Math.max(0, Math.min(100, t.progress || 0))}%"></i></div>
       </div>
-      <div>${t.status === 'downloading' ? fmtSpeed(t.speed) : '—'}</div>
-      <div>${t.eta || '—'}</div>`;
+      <div>${t.status === 'downloading' ? fmtSpeed(t.speed) : '—'}</div>`;
     el.addEventListener('mousedown', (e) => onRowClick(e, t.id, list));
     el.addEventListener('dblclick', () => {
       if (t.status === 'completed') window.sdl.openFile(t.id);
@@ -110,15 +109,49 @@ function selectedTasks() {
   return state.tasks.filter((t) => selected.has(t.id));
 }
 
+function canResume(items) {
+  return items.some((t) => t.status === 'paused' || t.status === 'error' || t.status === 'queued');
+}
+function canPause(items) {
+  return items.some((t) => t.status === 'downloading' || t.status === 'queued' || t.status === 'merging');
+}
+
 function syncToolbar() {
   const items = selectedTasks();
   const one = items.length === 1;
   const any = items.length > 0;
-  $('btnResume').disabled = !items.some((t) => t.status === 'paused' || t.status === 'error' || t.status === 'queued');
-  $('btnPause').disabled = !items.some((t) => t.status === 'downloading' || t.status === 'queued' || t.status === 'merging');
+  $('btnResume').disabled = !canResume(items);
+  $('btnPause').disabled = !canPause(items);
   $('btnDelete').disabled = !any;
-  $('btnOpen').disabled = !one || items[0].status !== 'completed';
+  $('btnOpen').disabled = !one;
   $('btnFolder').disabled = !one;
+  document.querySelectorAll('.menu-drop .need-sel').forEach((el) => {
+    const act = el.dataset.act;
+    if (act === 'resume') el.disabled = !canResume(items);
+    else if (act === 'pause') el.disabled = !canPause(items);
+    else el.disabled = !any;
+  });
+  document.querySelectorAll('.menu-drop .need-any').forEach((el) => {
+    el.disabled = state.tasks.length === 0;
+  });
+  document.querySelectorAll('.menu-drop .need-one').forEach((el) => {
+    el.disabled = !one;
+  });
+  document.querySelectorAll('.menu-drop .need-done').forEach((el) => {
+    el.disabled = !state.tasks.some((t) => t.status === 'completed');
+  });
+}
+
+function closeMenus() {
+  document.querySelectorAll('.menu').forEach((m) => m.classList.remove('open'));
+}
+
+function toggleMenu(name) {
+  const wrap = document.querySelector(`.menu-btn[data-menu="${name}"]`)?.parentElement;
+  if (!wrap) return;
+  const open = wrap.classList.contains('open');
+  closeMenus();
+  if (!open) wrap.classList.add('open');
 }
 
 function applyState(data) {
@@ -292,22 +325,119 @@ function dialogAbout() {
 async function removeSelected() {
   const items = selectedTasks();
   if (!items.length) return;
-  const ok = confirm(`删除 ${items.length} 个任务？`);
+  const ok = confirm(`删除选中的 ${items.length} 个任务？`);
   if (!ok) return;
   const delFile = confirm('是否同时删除已下载的文件？\n选“取消”只从列表移除。');
   for (const t of items) await window.sdl.remove(t.id, delFile);
   selected.clear();
 }
 
+async function clearAllTasks() {
+  if (!state.tasks.length) return;
+  const ok = confirm('清空所有任务？');
+  if (!ok) return;
+  const delFile = confirm('是否同时删除已下载的文件？\n选“取消”只清空列表。');
+  await window.sdl.clearAll(delFile);
+  selected.clear();
+}
+
+function setFilter(next, cat) {
+  filter = next;
+  category = cat || '';
+  document.querySelectorAll('.nav').forEach((b) => {
+    const match = cat ? b.dataset.cat === cat : b.dataset.filter === next;
+    b.classList.toggle('active', Boolean(match));
+  });
+  render();
+}
+
+function dialogProgress() {
+  const t = selectedTasks()[0];
+  if (!t) return;
+  const ranges = t.ranges || [];
+  const rows = ranges.length
+    ? ranges.map((r, i) => {
+      const total = r.end - r.start + 1;
+      const pct = total ? Math.min(100, (r.done / total) * 100) : 0;
+      return `<div class="thread"><span>${String(i + 1).padStart(2, '0')}</span><div class="bar"><i style="width:${pct}%"></i></div><span>${fmtSize(r.done)} / ${fmtSize(total)}</span></div>`;
+    }).join('')
+    : '<p>当前任务未分段，或尚未开始探测。</p>';
+  openModal(`
+    <div class="dlg-h">下载进度 · ${escapeHtml(t.filename)}</div>
+    <div class="dlg-b">
+      <p>连接数 ${t.connections || 1} · 峰值线程 ${t.peakThreads || t.connections || 1} · ${escapeHtml(statusText(t))}</p>
+      ${rows}
+    </div>
+    <div class="dlg-f"><button class="btn primary" id="fOk">关闭</button></div>`);
+  $('fOk').onclick = closeModal;
+}
+
+async function addFromClipboard() {
+  const text = String(await window.sdl.readClip() || '').trim();
+  const m = text.match(/https?:\/\/[^\s]+/i);
+  if (!m) {
+    alert('剪贴板里没有可用的 http(s) 链接。');
+    return;
+  }
+  dialogAdd({ url: m[0] });
+}
+
+function runAction(act) {
+  closeMenus();
+  if (act === 'add') dialogAdd();
+  if (act === 'paste') addFromClipboard();
+  if (act === 'resume') selectedTasks().forEach((t) => window.sdl.resume(t.id));
+  if (act === 'pause') selectedTasks().forEach((t) => window.sdl.pause(t.id));
+  if (act === 'pauseAll') window.sdl.pauseAll();
+  if (act === 'resumeAll') window.sdl.resumeAll();
+  if (act === 'delete') removeSelected();
+  if (act === 'clear') clearAllTasks();
+  if (act === 'clearDone') window.sdl.clearCompleted();
+  if (act === 'settings') dialogSettings();
+  if (act === 'open') { const t = selectedTasks()[0]; if (t) window.sdl.openFile(t.id); }
+  if (act === 'folder') { const t = selectedTasks()[0]; if (t) window.sdl.openFolder(t.id); }
+  if (act === 'openDir') window.sdl.openDownloadDir();
+  if (act === 'copyUrl') {
+    const t = selectedTasks()[0];
+    if (t) window.sdl.writeClip(t.url);
+  }
+  if (act === 'filterAll') setFilter('all');
+  if (act === 'filterDown') setFilter('downloading');
+  if (act === 'filterDone') setFilter('completed');
+  if (act === 'progress') dialogProgress();
+  if (act === 'help') dialogHelp();
+  if (act === 'about') dialogAbout();
+  if (act === 'quit') window.sdl.quit();
+}
+
 function bind() {
   $('btnAdd').onclick = () => dialogAdd();
-  $('btnResume').onclick = () => selectedTasks().forEach((t) => window.sdl.resume(t.id));
-  $('btnPause').onclick = () => selectedTasks().forEach((t) => window.sdl.pause(t.id));
-  $('btnPauseAll').onclick = () => window.sdl.pauseAll();
-  $('btnDelete').onclick = removeSelected;
-  $('btnOpen').onclick = () => { const t = selectedTasks()[0]; if (t) window.sdl.openFile(t.id); };
-  $('btnFolder').onclick = () => { const t = selectedTasks()[0]; if (t) window.sdl.openFolder(t.id); };
+  $('btnResume').onclick = () => runAction('resume');
+  $('btnPause').onclick = () => runAction('pause');
+  $('btnPauseAll').onclick = () => runAction('pauseAll');
+  $('btnDelete').onclick = () => runAction('delete');
+  $('btnOpen').onclick = () => runAction('open');
+  $('btnFolder').onclick = () => runAction('folder');
   $('btnSniff').onclick = dialogHelp;
+
+  document.querySelectorAll('.menu-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMenu(btn.dataset.menu);
+    });
+    btn.addEventListener('mouseenter', () => {
+      if (!document.querySelector('.menu.open')) return;
+      closeMenus();
+      btn.parentElement.classList.add('open');
+    });
+  });
+  document.querySelectorAll('.menu-drop button').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (btn.disabled) return;
+      runAction(btn.dataset.act);
+    });
+  });
 
   document.querySelectorAll('.nav').forEach((btn) => {
     btn.onclick = () => {
@@ -319,12 +449,27 @@ function bind() {
     };
   });
 
+  $('rows').addEventListener('mousedown', (e) => {
+    if (e.target === $('rows')) {
+      selected.clear();
+      lastSelected = '';
+      render();
+    }
+  });
+
   $('modal').addEventListener('click', (e) => {
     if (e.target.id === 'modal') closeModal();
   });
+  document.addEventListener('click', () => closeMenus());
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Delete') removeSelected();
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') { closeModal(); closeMenus(); }
+    if (e.altKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); toggleMenu('task'); }
+    if (e.altKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); toggleMenu('file'); }
+    if (e.altKey && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); toggleMenu('download'); }
+    if (e.altKey && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); toggleMenu('view'); }
+    if (e.altKey && (e.key === 'h' || e.key === 'H')) { e.preventDefault(); toggleMenu('help'); }
+    if (e.ctrlKey && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); dialogAdd(); }
   });
 
   window.sdl.onTasks(applyState);
@@ -332,25 +477,7 @@ function bind() {
     if (items.length === 1) dialogAdd(items[0]);
     else dialogCapture(items);
   });
-  window.sdl.onUi((name, data) => {
-    if (name === 'add') dialogAdd();
-    if (name === 'resume') selectedTasks().forEach((t) => window.sdl.resume(t.id));
-    if (name === 'pause') selectedTasks().forEach((t) => window.sdl.pause(t.id));
-    if (name === 'delete') removeSelected();
-    if (name === 'open') { const t = selectedTasks()[0]; if (t) window.sdl.openFile(t.id); }
-    if (name === 'folder') { const t = selectedTasks()[0]; if (t) window.sdl.openFolder(t.id); }
-    if (name === 'settings') dialogSettings();
-    if (name === 'help') dialogHelp();
-    if (name === 'about') dialogAbout();
-    if (name === 'filter') {
-      filter = data || 'all';
-      category = '';
-      document.querySelectorAll('.nav').forEach((b) => {
-        b.classList.toggle('active', b.dataset.filter === filter);
-      });
-      render();
-    }
-  });
+  window.sdl.onUi((name) => runAction(name));
 }
 
 (async function init() {

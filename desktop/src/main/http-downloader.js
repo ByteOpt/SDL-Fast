@@ -1,15 +1,16 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const { request } = require('./net');
 const { isHuggingFace, isSignedCdn } = require('./classify');
 
 function planConnections(size, requested, url) {
-  if (!size || size < 1024 * 1024) return 1;
+  if (!size || size < 256 * 1024) return 1;
   let max = Math.min(64, requested || 16);
   if (isSignedCdn(url) && !isHuggingFace(url)) max = Math.min(max, 8);
   if (isHuggingFace(url)) max = Math.min(64, Math.max(max, 16));
-  const minChunk = isHuggingFace(url) ? 4 * 1024 * 1024 : 1024 * 1024;
+  const minChunk = isHuggingFace(url) ? 4 * 1024 * 1024 : 256 * 1024;
   return Math.max(1, Math.min(max, Math.ceil(size / minChunk)));
 }
 
@@ -35,6 +36,8 @@ class HttpDownloader {
     this.abort = new AbortController();
     this.fd = null;
     this.alive = true;
+    this.activeThreads = 0;
+    this.peakThreads = 0;
   }
 
   stop() {
@@ -46,27 +49,48 @@ class HttpDownloader {
   async run(info) {
     const task = this.task;
     const dest = task.savePath;
-    fs.mkdirSync(require('path').dirname(dest), { recursive: true });
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
     const size = info.size || 0;
+    const finalUrl = info.url || task.url;
     const canRange = info.acceptRanges && size > 0;
 
     if (!canRange) {
-      await this.downloadWhole(info.url || task.url);
+      await this.downloadWhole(finalUrl);
+      task.connections = 1;
       return;
     }
 
     const n = planConnections(size, task.connections, task.url);
-    if (!task.ranges || task.ranges.length !== n || task.size !== size) {
-      task.ranges = splitRanges(size, n);
-    }
+    const reuse = Array.isArray(task.ranges)
+      && task.ranges.length === n
+      && task.size === size
+      && task.ranges.some((r) => r.done > 0);
+    if (!reuse) task.ranges = splitRanges(size, n);
     task.size = size;
     task.connections = n;
-    this.fd = await fs.promises.open(dest, 'w+');
-    await this.fd.truncate(size);
 
-    const workers = task.ranges.map((range, idx) => this.downloadRange(info.url || task.url, range, idx));
+    const exists = fs.existsSync(dest);
+    this.fd = await fs.promises.open(dest, exists && reuse ? 'r+' : 'w+');
+    if (!(exists && reuse)) await this.fd.truncate(size);
+
     try {
+      const workers = task.ranges.map((range, idx) => this.downloadRange(finalUrl, range, idx));
       await Promise.all(workers);
+    } catch (err) {
+      if (/no-range/i.test(String(err.message))) {
+        this.stop();
+        this.alive = true;
+        this.abort = new AbortController();
+        if (this.fd) {
+          await this.fd.close();
+          this.fd = null;
+        }
+        task.ranges = null;
+        task.connections = 1;
+        await this.downloadWhole(finalUrl);
+        return;
+      }
+      throw err;
     } finally {
       if (this.fd) {
         await this.fd.close();
@@ -74,6 +98,7 @@ class HttpDownloader {
       }
     }
     task.downloaded = size;
+    task.peakThreads = this.peakThreads;
   }
 
   async downloadWhole(url) {
@@ -90,6 +115,8 @@ class HttpDownloader {
     const flags = res.statusCode === 206 ? 'a' : 'w';
     const stream = fs.createWriteStream(tmp, { flags });
     let got = flags === 'a' ? existing : 0;
+    this.activeThreads = 1;
+    this.peakThreads = 1;
     await new Promise((resolve, reject) => {
       res.on('data', (chunk) => {
         got += chunk.length;
@@ -117,42 +144,53 @@ class HttpDownloader {
         return;
       } catch (err) {
         if (!this.alive || /aborted/i.test(String(err.message))) throw err;
+        if (/no-range/i.test(String(err.message))) throw err;
         await sleep(400 * (attempt + 1));
       }
     }
     throw new Error(`分段 ${idx + 1} 多次失败`);
   }
 
-  async pullRange(url, range, idx) {
+  async pullRange(url, range) {
     const from = range.start + (range.done || 0);
     const to = range.end;
     if (from > to) return;
     const headers = Object.assign({}, this.task.headers, { Range: `bytes=${from}-${to}` });
     const { res } = await request(url, { headers, signal: this.abort.signal, timeout: 60000 });
-    if (res.statusCode !== 206 && res.statusCode !== 200) {
+    if (res.statusCode === 200) {
+      res.resume();
+      throw new Error('no-range');
+    }
+    if (res.statusCode !== 206) {
       res.resume();
       throw new Error(`HTTP ${res.statusCode}`);
     }
-    await new Promise((resolve, reject) => {
-      let offset = from;
-      res.on('data', (chunk) => {
-        if (!this.alive) {
-          res.destroy();
-          return;
-        }
-        const buf = Buffer.from(chunk);
-        fs.writeSync(this.fd.fd, buf, 0, buf.length, offset);
-        offset += buf.length;
-        range.done = offset - range.start;
-        this.recount();
-        this.hooks.onProgress();
+    this.activeThreads += 1;
+    this.peakThreads = Math.max(this.peakThreads, this.activeThreads);
+    try {
+      await new Promise((resolve, reject) => {
+        let offset = from;
+        res.on('data', (chunk) => {
+          if (!this.alive) {
+            res.destroy();
+            return;
+          }
+          const buf = Buffer.from(chunk);
+          fs.writeSync(this.fd.fd, buf, 0, buf.length, offset);
+          offset += buf.length;
+          range.done = offset - range.start;
+          this.recount();
+          this.hooks.onProgress();
+        });
+        res.on('end', () => {
+          if (offset < to + 1 && this.alive) reject(new Error('分段中断'));
+          else resolve();
+        });
+        res.on('error', reject);
       });
-      res.on('end', () => {
-        if (offset < to + 1 && this.alive) reject(new Error('分段中断'));
-        else resolve();
-      });
-      res.on('error', reject);
-    });
+    } finally {
+      this.activeThreads = Math.max(0, this.activeThreads - 1);
+    }
   }
 
   recount() {

@@ -8,11 +8,12 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --win portable --x64"
+    "pack": "electron-builder --win nsis --x64"
   },
   "build": {
     "appId": "com.sdlfast.desktop",
     "productName": "SDL Fast",
+    "artifactName": "SDL Fast-setup.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -20,15 +21,15 @@
       "src/**/*",
       "assets/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "../extension",
+        "to": "extension"
+      }
+    ],
     "win": {
       "icon": "assets/icon.ico",
       "target": [
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        },
         {
           "target": "nsis",
           "arch": [
@@ -40,7 +41,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "shortcutName": "SDL Fast",
+      "uninstallDisplayName": "SDL Fast"
     }
   },
   "devDependencies": {

@@ -7,6 +7,61 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <nav class="menubar" id="menubar">
+    <div class="menu">
+      <button class="menu-btn" data-menu="task">任务(<u>T</u>)</button>
+      <div class="menu-drop">
+        <button data-act="resume" class="need-sel">恢复选中</button>
+        <button data-act="pause" class="need-sel">暂停选中</button>
+        <button data-act="delete" class="need-sel">删除选中</button>
+        <hr>
+        <button data-act="clearDone" class="need-done">清空已完成</button>
+        <button data-act="clear" class="need-any">清空所有任务</button>
+        <hr>
+        <button data-act="settings">选项/设置...</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-btn" data-menu="file">文件(<u>F</u>)</button>
+      <div class="menu-drop">
+        <button data-act="open" class="need-one">打开</button>
+        <button data-act="folder" class="need-one">打开所在文件夹</button>
+        <button data-act="openDir">打开下载文件夹</button>
+        <button data-act="copyUrl" class="need-one">复制下载地址</button>
+        <hr>
+        <button data-act="quit">退出</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-btn" data-menu="download">下载(<u>D</u>)</button>
+      <div class="menu-drop">
+        <button data-act="add">添加URL</button>
+        <button data-act="paste">从剪贴板添加URL</button>
+        <hr>
+        <button data-act="resumeAll" class="need-any">全部开始</button>
+        <button data-act="pauseAll" class="need-any">全部暂停</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-btn" data-menu="view">查看(<u>V</u>)</button>
+      <div class="menu-drop">
+        <button data-act="filterAll">所有下载</button>
+        <button data-act="filterDown">正在下载</button>
+        <button data-act="filterDone">已完成</button>
+        <hr>
+        <button data-act="progress" class="need-one">打开进度窗口</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-btn" data-menu="help">帮助(<u>H</u>)</button>
+      <div class="menu-drop">
+        <button data-act="help">嗅探插件</button>
+        <hr>
+        <button data-act="about">关于</button>
+      </div>
+    </div>
+  </nav>
+
   <header class="toolbar">
     <button class="tb" id="btnAdd" title="添加 URL">
       <span class="ico add"></span>
@@ -17,11 +72,11 @@
       <span>恢复</span>
     </button>
     <button class="tb" id="btnPause" disabled>
-      <span class="ico pause"></span>
-      <span>暂停</span>
+      <span class="ico stop"></span>
+      <span>停止</span>
     </button>
     <button class="tb" id="btnPauseAll">
-      <span class="ico stop"></span>
+      <span class="ico pause"></span>
       <span>全部暂停</span>
     </button>
     <button class="tb" id="btnDelete" disabled>
@@ -45,16 +100,15 @@
   <div class="main">
     <aside class="side">
       <div class="side-title">类别</div>
-      <button class="nav active" data-filter="all">全部下载</button>
+      <button class="nav active" data-filter="all">所有下载</button>
       <button class="nav" data-filter="downloading">正在下载</button>
       <button class="nav" data-filter="completed">已完成</button>
       <div class="side-title">分类</div>
-      <button class="nav" data-cat="video">视频</button>
-      <button class="nav" data-cat="music">音乐</button>
-      <button class="nav" data-cat="program">程序</button>
-      <button class="nav" data-cat="archive">压缩文件</button>
-      <button class="nav" data-cat="document">文档</button>
-      <button class="nav" data-cat="model">大模型</button>
+      <button class="nav" data-cat="video"><i class="si video"></i>视频</button>
+      <button class="nav" data-cat="music"><i class="si music"></i>音乐</button>
+      <button class="nav" data-cat="program"><i class="si program"></i>程序</button>
+      <button class="nav" data-cat="archive"><i class="si archive"></i>压缩包</button>
+      <button class="nav" data-cat="document"><i class="si document"></i>文档</button>
     </aside>
 
     <section class="list-wrap">
@@ -64,7 +118,6 @@
         <span class="c-status">状态</span>
         <span class="c-prog">进度</span>
         <span class="c-speed">速度</span>
-        <span class="c-eta">剩余时间</span>
       </div>
       <div id="rows" class="rows"></div>
       <div id="empty" class="empty">还没有下载任务。点击“添加URL”或使用浏览器嗅探。</div>

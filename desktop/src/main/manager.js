@@ -72,6 +72,8 @@ class Manager extends EventEmitter {
       eta: t.eta || '',
       progress: t.size ? Math.min(100, (t.downloaded / t.size) * 100) : (t.status === 'completed' ? 100 : 0),
       createdAt: t.createdAt,
+      ranges: (t.ranges || []).map((r) => ({ start: r.start, end: r.end, done: r.done || 0 })),
+      peakThreads: t.peakThreads || t.connections || 0,
     }));
   }
 
@@ -198,6 +200,16 @@ class Manager extends EventEmitter {
     }
     this.persist();
     this.emitChange();
+  }
+
+  clearAll(deleteFile) {
+    const ids = this.tasks.map((t) => t.id);
+    for (const id of ids) this.remove(id, deleteFile);
+  }
+
+  clearCompleted() {
+    const ids = this.tasks.filter((t) => t.status === 'completed').map((t) => t.id);
+    for (const id of ids) this.remove(id, false);
   }
 
   kick() {

@@ -5,9 +5,15 @@ const https = require('https');
 const { URL } = require('url');
 
 const MAX_REDIRECTS = 8;
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 64, maxFreeSockets: 16 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 64, maxFreeSockets: 16 });
+
+function pickLib(u) {
+  return u.protocol === 'https:' ? https : http;
+}
 
 function pickAgent(u) {
-  return u.protocol === 'https:' ? https : http;
+  return u.protocol === 'https:' ? httpsAgent : httpAgent;
 }
 
 function request(url, options = {}) {
@@ -23,7 +29,7 @@ function request(url, options = {}) {
         reject(err);
         return;
       }
-      const lib = pickAgent(parsed);
+      const lib = pickLib(parsed);
       const headers = Object.assign({}, options.headers || {});
       const req = lib.request({
         protocol: parsed.protocol,
@@ -32,6 +38,7 @@ function request(url, options = {}) {
         path: parsed.pathname + parsed.search,
         method: options.method || 'GET',
         headers,
+        agent: pickAgent(parsed),
         timeout: options.timeout || 30000,
       }, (res) => {
         const code = res.statusCode || 0;
@@ -66,24 +73,24 @@ function header(res, name) {
 
 async function probe(url, headers) {
   const common = { headers, timeout: 20000 };
-  let result = await request(url, Object.assign({ method: 'HEAD' }, common));
-  if (result.res.statusCode >= 400 || !header(result.res, 'content-length')) {
+  let result = await request(url, Object.assign({
+    method: 'GET',
+    headers: Object.assign({}, headers, { Range: 'bytes=0-0' }),
+  }, common));
+  if (result.res.statusCode >= 400) {
     result.res.resume();
-    result = await request(url, Object.assign({
-      method: 'GET',
-      headers: Object.assign({}, headers, { Range: 'bytes=0-0' }),
-    }, { timeout: 20000 }));
+    result = await request(url, Object.assign({ method: 'HEAD' }, common));
   }
   const res = result.res;
   const mime = header(res, 'content-type').split(';')[0].trim();
-  const acceptRanges = /bytes/i.test(header(res, 'accept-ranges')) || header(res, 'content-range');
+  const hasRange = res.statusCode === 206 || /bytes/i.test(header(res, 'accept-ranges')) || Boolean(header(res, 'content-range'));
   let size = 0;
   const cr = header(res, 'content-range');
   const m = /\/(\d+)\s*$/.exec(cr);
   if (m) size = parseInt(m[1], 10);
   else {
     const cl = parseInt(header(res, 'content-length'), 10);
-    if (Number.isFinite(cl)) size = cl;
+    if (Number.isFinite(cl) && res.statusCode !== 206) size = cl;
   }
   const disp = header(res, 'content-disposition');
   let filename = '';
@@ -97,7 +104,7 @@ async function probe(url, headers) {
     status: res.statusCode,
     mime,
     size,
-    acceptRanges: Boolean(acceptRanges && size > 0),
+    acceptRanges: Boolean(hasRange && size > 1),
     filename,
   };
 }

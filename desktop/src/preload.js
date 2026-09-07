@@ -10,11 +10,17 @@ contextBridge.exposeInMainWorld('sdl', {
   pauseAll: () => ipcRenderer.invoke('task:pauseAll'),
   resumeAll: () => ipcRenderer.invoke('task:resumeAll'),
   remove: (id, deleteFile) => ipcRenderer.invoke('task:remove', { id, deleteFile }),
+  clearAll: (deleteFile) => ipcRenderer.invoke('task:clearAll', deleteFile),
+  clearCompleted: () => ipcRenderer.invoke('task:clearCompleted'),
+  readClip: () => ipcRenderer.invoke('clip:read'),
+  writeClip: (text) => ipcRenderer.invoke('clip:write', text),
+  quit: () => ipcRenderer.invoke('app:quit'),
   openFile: (id) => ipcRenderer.invoke('task:open', id),
   openFolder: (id) => ipcRenderer.invoke('task:folder', id),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   pickFolder: () => ipcRenderer.invoke('dialog:folder'),
+  openDownloadDir: () => ipcRenderer.invoke('app:openDownloadDir'),
   appInfo: () => ipcRenderer.invoke('app:info'),
   onTasks: (cb) => {
     const fn = (_e, data) => cb(data);
@@ -27,7 +33,7 @@ contextBridge.exposeInMainWorld('sdl', {
     return () => ipcRenderer.removeListener('capture:items', fn);
   },
   onUi: (cb) => {
-    const channels = ['ui:add', 'ui:resume', 'ui:pause', 'ui:delete', 'ui:open', 'ui:folder', 'ui:settings', 'ui:help', 'ui:about', 'ui:filter'];
+    const channels = ['ui:add', 'ui:resume', 'ui:pause', 'ui:delete', 'ui:open', 'ui:folder', 'ui:settings', 'ui:help', 'ui:about', 'ui:filter', 'ui:clear'];
     const handlers = channels.map((ch) => {
       const fn = (_e, data) => cb(ch.replace('ui:', ''), data);
       ipcRenderer.on(ch, fn);
